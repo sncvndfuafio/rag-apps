@@ -18,9 +18,7 @@ class VectorDBService:
             print(f"Creating Pinecone index: {self.index_name}")
             self.pinecone.create_index(
                 name=self.index_name,
-                # ENSURE this dimension matches your chosen HuggingFace model
-                # 'paraphrase-MiniLM-L3-v2' has a dimension of 384
-                dimension=384,
+                dimension=384, # Ensure this matches your HuggingFace embedding model
                 metric="cosine",
                 spec={"serverless": {"cloud": "aws", "region": config.PINECONE_ENVIRONMENT}}
             )
@@ -42,8 +40,10 @@ class VectorDBService:
         return response
 
     def get_retriever(self):
+        """Returns a LangChain retriever for the Pinecone vector store."""
         if self.vectorstore is None:
             self._initialize_vectorstore()
-        return self.vectorstore.as_retriever()
+        # FIX: Increase 'k' to retrieve more documents
+        return self.vectorstore.as_retriever(search_kwargs={"k": 10}) # Retrieve 10 most relevant chunks
 
 vectordb_service = VectorDBService()

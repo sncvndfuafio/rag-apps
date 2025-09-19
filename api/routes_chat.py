@@ -1,12 +1,12 @@
-# rag_app/api/routes_chat.py
 from fastapi import APIRouter
 from pydantic import BaseModel
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple
 
 from langchain_groq import ChatGroq
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.documents import Document # Added for type hinting in debug
 
 from langgraph.graph import StateGraph, END
 
@@ -28,7 +28,17 @@ def retrieve(state: GraphState) -> GraphState:
     print("---RETRIEVE---")
     question = state.question
     retriever = vectordb_service.get_retriever()
-    docs = retriever.invoke(question)
+    docs: List[Document] = retriever.invoke(question) # Type hint for clarity
+
+    # CRITICAL DEBUGGING LINES: These will print to your Uvicorn terminal
+    print(f"Retrieved {len(docs)} documents for query: '{question}'")
+    if not docs:
+        print("WARNING: No documents were retrieved from Pinecone for this query!")
+    for i, doc in enumerate(docs):
+        print(f"--- Document {i+1} (Page: {doc.metadata.get('page_number', 'N/A')}, File ID: {doc.metadata.get('file_id', 'N/A')}) ---")
+        print(doc.page_content[:500] + ("..." if len(doc.page_content) > 500 else "")) # Print up to 500 chars of content
+        print("-" * 50)
+    # END CRITICAL DEBUGGING
 
     context = "\n\n".join([doc.page_content for doc in docs])
     return GraphState(question=question, context=context)
@@ -41,7 +51,9 @@ def generate(state: GraphState) -> GraphState:
     llm = ChatGroq(
         temperature=0,
         groq_api_key=config.GROQ_API_KEY,
-        model_name="llama-3.3-70b-versatile" # Using the smaller, generally stable Llama 3 for now
+        # UPDATED: Model name to 'llama-3.3-70b-versatile' as requested.
+        # Ensure this is the EXACT, currently supported model name from Groq's console/docs.
+        model_name="llama-3.3-70b-versatile"
     )
 
     prompt = ChatPromptTemplate.from_template(
